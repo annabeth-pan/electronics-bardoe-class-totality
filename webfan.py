@@ -42,7 +42,7 @@ def set_led(percent):
     
 # ---- Wi-Fi Access Point ----
 ap = network.WLAN(network.AP_IF)
-ap.config(essid="PAN-FAN-1", password="pico1234")
+ap.config(essid="PAN-FAN-4", password="pico1234")
 ap.active(True)
 print("AP IP:", ap.ifconfig()[0])
 
@@ -56,6 +56,10 @@ def webpage(state, speed):
             function sendSpeed(value) {{
                 fetch("/set?speed=" + value);
                 document.getElementById("speedValue").innerText = value;
+            }}
+            function sendIntensity(value) {{
+                fetch("/set?intensity=" + value);
+                document.getElementById("ledValue").innerText = value;
             }}
         </script>
     </head>
@@ -71,18 +75,18 @@ def webpage(state, speed):
 
         <input type="range" min="0" max="100" value="{speed}"
                oninput="sendSpeed(this.value)">
+               
+        <h1>LED Control</h1>
+        
+        <a href="/?led=off"><button>Turn OFF</button></a>
+
+        <h3>Intensity: <span id="ledValue">{intensity}</span>%</h3>
+
+        <input type="range" min="0" max="100" value="{intensity}"
+               oninput="sendIntensity(this.value)">
     </body>
     </html>
     """
-
-"""         <h1>LED Control</h1>
-        <a href="/?led=on"><button>Turn ON</button></a>
-        <a href="/?led=off"><button>Turn OFF</button></a>
-
-        <h3>Intensity: <span id="ledValue">{speed}</span>%</h3>
-
-        <input type="range" min="0" max="100" value="{speed}"
-               oninput="sendSpeed(this.value)">"""
 
 # ---- HTTP Server ----
 addr = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
@@ -93,6 +97,7 @@ print("Listening on", addr)
 
 state = "OFF"
 speed = 0
+intensity = 0
 motor_off()
 led_off()
 
@@ -109,12 +114,10 @@ while True:
         
         motor_forward()
         set_speed(speed)
-        set_led(speed)
         state = "ON"
         
     elif "/?fan=off" in request:
         motor_off()
-        led_off()
         speed = 0
         state = "OFF"
 
@@ -128,11 +131,22 @@ while True:
                 motor_forward()
                 state = "ON"
             set_speed(speed)
-            set_led(speed)
-            print(speed)
         except:
             pass
-
+    
+    if "/?led=off" in request:
+        intensity = 0
+        set_led(intensity)
+        
+    if "/set?intensity=" in request:
+        try:
+            new_intensity = int(request.split("intensity=")[1].split()[0])
+            new_intensity = max(0, min(100, new_intensity))
+            intensity = new_intensity
+            set_led(intensity)
+        except:
+            pass
+    
     # Send webpage back (unless AJAX call)
     if "GET /set?" not in request:
         cl.send("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n")
